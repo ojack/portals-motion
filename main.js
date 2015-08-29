@@ -1,12 +1,12 @@
  var Peer = require('peerjs');
  var SlitScan= require('./js/SlitScan.js');
- var CanvasBlend= require('./js/CanvasBlend.js');
+ var CanvasMotion= require('./js/CanvasMotion.js');
  var WebGL= require('./js/WebGL.js');
 var FPS = 10;
 
 var peer_api_key = '00gwj72654mfgvi';
 
-var slit, peer, dataChannel, localStream, remoteStream, slit, id, host;
+var slit, peer, dataChannel, localStream, remoteStream, slit, id, host, webGL;
 
 var communication = document.getElementById("communication");
   // Compatibility shim
@@ -111,11 +111,11 @@ function initParticipant(stream){
 function initVideoEvents(call, stream){
    call.on('stream', function(theirStream){
                       //$('#their-video').prop('src', URL.createObjectURL(theirStream));
-    
-                      slit = new CanvasBlend(stream, theirStream);
-                      window.addEventListener( 'resize', function(){
-                        slit.resize();
-                      }, false );
+                      webGL = new WebGL(stream, theirStream);
+                      //slit = new CanvasMotion(stream, theirStream);
+                      // window.addEventListener( 'resize', function(){
+                      //   slit.resize();
+                      // }, false );
 
                       hideLanding();
                       
@@ -134,10 +134,11 @@ function addFrame(){
    setTimeout(function() {
       addFrame();
        //console.log(dataChannel);
-       var vol = slit.getVolume();
-     //  console.log("sending "+ vol);
-       dataChannel.send(slit.getVolume());
-         slit.addFrame();
+     //   var vol = slit.getVolume();
+     // //  console.log("sending "+ vol);
+     //   dataChannel.send(slit.getVolume());
+       webGL.addFrame();
+        //slit.addFrame();
         // Drawing code goes here
     }, 1000/FPS);
 }
@@ -155,43 +156,49 @@ function toggleVideo(){
 }
 function checkKey(e){
   e = e || window.event;
-  
-  console.log(e);
-  if(slit!=null){
-    e.preventDefault();
-    //arrow keys change step size
-    if(e.keyCode==38){
-      slit.increaseStep();
+  if(webGL != null){
+     if(e.keyCode==38){
+      webGL.increaseDelay();
     } else if(e.keyCode==40){
-      slit.decreaseStep();
-    } else if(e.keyCode==83){
-       if(FPS>0.1){
-        if(FPS<=1){
-          FPS-=0.1;
-        } else {
-          FPS--;
-        }
-      }
-      console.log(FPS);
-    } else if(e.keyCode==70){ 
-      FPS++;
-      console.log(FPS);
-    } else if(e.keyCode==77){
-      //m to change mode
-      slit.changeMode();
-    } else if(e.keyCode==73){
-      //show or hide instructions
-    } else if(e.keyCode==8){
-      slit.restart();
-      //show or hide instructions
-     } else if(e.keyCode==65){
-     toggleMute();
-      //a for toggle mute
-    } else if(e.keyCode==86){
-      toggleVideo();
-    } else if(e.keyCode==66){
-      slit.changeBlend();
-    }
-
+      webGL.decreaseDelay();
+    } 
   }
+  console.log(e);
+  // if(slit!=null){
+  //   e.preventDefault();
+  //   //arrow keys change step size
+  //   if(e.keyCode==38){
+  //     slit.increaseStep();
+  //   } else if(e.keyCode==40){
+  //     slit.decreaseStep();
+  //   } else if(e.keyCode==83){
+  //      if(FPS>0.1){
+  //       if(FPS<=1){
+  //         FPS-=0.1;
+  //       } else {
+  //         FPS--;
+  //       }
+  //     }
+  //     console.log(FPS);
+  //   } else if(e.keyCode==70){ 
+  //     FPS++;
+  //     console.log(FPS);
+  //   } else if(e.keyCode==77){
+  //     //m to change mode
+  //     slit.changeMode();
+  //   } else if(e.keyCode==73){
+  //     //show or hide instructions
+  //   } else if(e.keyCode==8){
+  //     slit.restart();
+  //     //show or hide instructions
+  //    } else if(e.keyCode==65){
+  //    toggleMute();
+  //     //a for toggle mute
+  //   } else if(e.keyCode==86){
+  //     toggleVideo();
+  //   } else if(e.keyCode==66){
+  //     slit.changeBlend();
+  //   }
+
+  // }
 }
