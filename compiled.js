@@ -1,4 +1,44 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/*
+* Draws an Ascii string onto a canvas element
+*/
+
+"use strict";
+
+var charString = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("").reverse().join("");
+var height = 512; // bigger here = sharper edges on the characters
+var block = "█";
+
+var AsciiGradient = function AsciiGradient() {
+	var canvas = document.createElement('canvas');
+	var context = canvas.getContext('2d');
+	context.font = height + 'px monospace';
+	metrics = context.measureText('i');
+
+	canvas = document.createElement('canvas');
+	canvas.height = height * 9 / 10;
+	canvas.width = metrics.width * charString.length;
+	// canvas.height =512;
+	// canvas.width =512;
+
+	context = canvas.getContext('2d');
+	context.fillStyle = 'black';
+	context.fillRect(0, 0, canvas.width, canvas.height);
+	context.font = height + 'px monospace';
+	context.fillStyle = 'white';
+
+	// yOffset is scaled so that it is 24 pixels at a height of 128.
+	var yOffset = 24 * height / 128;
+	context.fillText(charString, 0, canvas.height - yOffset);
+
+	this.canvas = canvas;
+	this.numChars = charString.length;
+	//document.body.appendChild(canvas);
+};
+
+module.exports = AsciiGradient;
+
+},{}],2:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -87,7 +127,7 @@ var AudioProcessing = (function () {
 exports["default"] = AudioProcessing;
 module.exports = exports["default"];
 
-},{}],2:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -107,9 +147,9 @@ var VID_STEP = 1;
 var video;
 var context;
 var blend_index = 0;
-var BLEND = ['overlay', 'difference', 'multiply', 'screen', 'darken', 'lighten', 'exclusion', 'color-burn', 'hard-light', 'soft-light', 'color', 'saturation'];
+var BLEND = ['difference', 'overlay', 'multiply', 'screen', 'darken', 'lighten', 'exclusion', 'color-burn', 'hard-light', 'soft-light', 'color', 'saturation'];
 
-var CanvasBlend = (function () {
+var CanvasMotion = (function () {
   function CanvasBlend(local_stream, remote_stream) {
     _classCallCheck(this, CanvasBlend);
 
@@ -118,19 +158,17 @@ var CanvasBlend = (function () {
     this.video.src = URL.createObjectURL(local_stream);
     this.remote = document.getElementById("remote-stream");
     this.remote.src = URL.createObjectURL(remote_stream);
-    var canvas = document.createElement('canvas');
 
     WIDTH = window.innerWidth;
     HEIGHT = window.innerHeight;
-    canvas.height = HEIGHT;
-    canvas.width = WIDTH;
-    this.canvas = canvas;
+    this.pastCanvas = this.createCanvas();
+    this.blendCanvas = this.createCanvas();
 
     this.outIndex = 0;
     this.vidIndex = 0;
     this.remoteVolume = 0;
     this.mode = 0;
-    document.body.insertBefore(canvas, document.body.firstChild);
+    //document.body.insertBefore(canvas, document.body.firstChild);
     console.log("created slit scan");
     console.log(this);
     this.localAudio = new AudioProcessing(local_stream, context);
@@ -139,6 +177,18 @@ var CanvasBlend = (function () {
   }
 
   _createClass(CanvasBlend, [{
+    key: 'createCanvas',
+    value: function createCanvas() {
+      var canvas = document.createElement('canvas');
+      canvas.height = HEIGHT;
+      canvas.width = WIDTH;
+      // canvas.style.position = "absolute";
+      canvas.style.top = "0px";
+      canvas.style.left = "0px";
+      document.body.insertBefore(canvas, document.body.firstChild);
+      return canvas;
+    }
+  }, {
     key: 'toggleProportional',
     value: function toggleProportional() {
       //this.proportional = val;
@@ -205,12 +255,19 @@ var CanvasBlend = (function () {
     key: 'addFrame',
     value: function addFrame() {
 
-      this.context = this.canvas.getContext('2d');
-      this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      this.context.globalCompositeOperation = BLEND[blend_index];
-      this.context.drawImage(this.video, 0, 0, this.video.videoWidth, this.video.videoHeight, 0, 0, this.canvas.width, this.canvas.height);
-      this.context.drawImage(this.remote, 0, 0, this.remote.videoWidth, this.remote.videoHeight, 0, 0, this.canvas.width, this.canvas.height);
+      this.pastCtx = this.pastCanvas.getContext('2d');
+      this.blendCtx = this.blendCanvas.getContext('2d');
+      //  if(this.outIndex%2==0){
+      this.blendCtx.clearRect(0, 0, this.blendCanvas.width, this.blendCanvas.height);
+      // }
+      this.blendCtx.globalCompositeOperation = BLEND[blend_index];
+      this.blendCtx.drawImage(this.pastCanvas, 0, 0);
+      /* get motion using difference modes */
+      this.blendCtx.drawImage(this.video, 0, 0, this.video.videoWidth, this.video.videoHeight, 0, 0, this.blendCanvas.width, this.blendCanvas.height);
+      this.pastCtx.drawImage(this.video, 0, 0, this.video.videoWidth, this.video.videoHeight, 0, 0, this.pastCanvas.width, this.pastCanvas.height);
+      //this.context.drawImage(this.video, 0, 0, this.remote.videoWidth, this.remote.videoHeight, 0, 0, this.canvas.width, this.canvas.height);
 
+      this.outIndex++;
       //  this.vidIndex = this.video.videoWidth/2;
       //  var vidHeight = this.video.videoHeight;
       // // console.log(vidHeight);
@@ -240,10 +297,271 @@ var CanvasBlend = (function () {
   return CanvasBlend;
 })();
 
-exports['default'] = CanvasBlend;
+exports['default'] = CanvasMotion;
 module.exports = exports['default'];
 
-},{"./AudioProcessing.js":1}],3:[function(require,module,exports){
+},{"./AudioProcessing.js":2}],4:[function(require,module,exports){
+/* Factory pattern for creating effects
+http://javascript.info/tutorial/factory-constructor-pattern
+*/
+
+"use strict";
+
+var ascii = require('./AsciiGradient.js');
+var t;
+
+function EffectChain(type, renderer, texture, lagTexture, texture2) {
+	// Throw an error if no constructor for the given automobile
+
+	//return eval("new " + type+"("+renderer+")");
+
+	var newEff = eval("new " + type + "(renderer, texture, lagTexture, texture2)");
+	return newEff;
+}
+
+var Blend = function Blend(renderer, texture, texture2) {
+	this.composer = new THREE.EffectComposer(renderer);
+	this.composer.addPass(new THREE.TexturePass(texture, 1.0));
+
+	this.Difference = new THREE.ShaderPass(THREE.DifferenceMirrorShader);
+
+	//this.Difference.renderToScreen = true;
+	this.Contrast = new THREE.ShaderPass(THREE.BrightnessContrastShader);
+	this.Contrast.uniforms['contrast'].value = 0.0;
+	this.Contrast.uniforms['brightness'].value = 0.2;
+	this.composer.addPass(this.Contrast);
+	this.composer.addPass(this.Difference);
+	this.Experiment = new THREE.ShaderPass(THREE.HueSaturationShader);
+	this.Experiment.renderToScreen = true;
+	this.composer.addPass(this.Experiment);
+};
+
+Blend.prototype.render = function (x, y) {
+	//this.Difference.uniforms[ 'sides' ].value = x*10;
+	this.Experiment.uniforms['hue'].value = x * 2.0 - 1.0;
+	this.Contrast.uniforms['contrast'].value = y;
+	//this.Contrast.uniforms['brightness'].value =  y*2.0 - 1.0;
+	//this.Difference.uniforms[ 'mixRatio' ].value = y;
+	this.composer.render();
+};
+
+// var RgbDots = function(renderer, texture){
+// 	console.log("rgb called");
+// 	this.composer = new THREE.EffectComposer( renderer );
+// 	this.composer.addPass( new THREE.TexturePass( texture, 1.0 ));
+// 	this.dotScreenEffect = new THREE.ShaderPass( THREE.DotScreenShader );
+// 	this.dotScreenEffect.uniforms[ 'scale' ].value = 0.8;
+// 	this.composer.addPass( this.dotScreenEffect );
+// 	this.rgbEffect = new THREE.ShaderPass( THREE.RGBShiftShader );
+// 	this.rgbEffect.uniforms[ 'amount' ].value = 0.0015;
+// 	this.rgbEffect.renderToScreen = true;
+// 	this.composer.addPass( this.rgbEffect);
+// }
+
+// RgbDots.prototype.render = function(x, y){
+// 	//this.texture.needsUpdate = true;
+// 	this.dotScreenEffect.uniforms[ 'scale' ].value = x*3 ;
+// 	this.rgbEffect.uniforms[ 'amount' ].value = y ;
+// 	this.composer.render();
+
+// }
+
+// var Kaleidoscope = function(renderer, texture){
+// 	this.composer = new THREE.EffectComposer( renderer );
+// 	this.composer.addPass( new THREE.TexturePass( texture, 1.0 ));
+// 	this.KaleidoEffect = new THREE.ShaderPass( THREE.KaleidoShader);
+// 	//this.KaleidoEffect.renderToScreen = true;
+// 	this.composer.addPass( this.KaleidoEffect);
+// 	this.ColorEffect = new THREE.ShaderPass( THREE.HueSaturationShader);
+// 	this.ColorEffect.renderToScreen = true;
+// 	this.composer.addPass( this.ColorEffect);
+// }
+
+// Kaleidoscope.prototype.render = function(x, y, frame){
+// 	var sides = Math.ceil(x*10);
+// 	this.KaleidoEffect.uniforms[ 'sides' ].value = x*7;
+// 	this.KaleidoEffect.uniforms[ 'offset' ].value = y*8;
+// 	this.ColorEffect.uniforms[ 'hue' ].value = Math.cos(frame*0.01);
+// 	this.composer.render();
+// }
+
+var KaleidoColor = function KaleidoColor(renderer, texture) {
+	this.composer = new THREE.EffectComposer(renderer);
+	this.composer.addPass(new THREE.TexturePass(texture, 1.0));
+	this.KaleidoEffect = new THREE.ShaderPass(THREE.KaleidoWarpShader);
+	//this.KaleidoEffect.renderToScreen = true;
+	this.composer.addPass(this.KaleidoEffect);
+	this.ColorEffect = new THREE.ShaderPass(THREE.ColorEffectShader);
+	//this.ColorEffect.uniforms[ 'saturation' ].value = 1.0;
+	this.ColorEffect.renderToScreen = true;
+	this.composer.addPass(this.ColorEffect);
+};
+
+KaleidoColor.prototype.render = function (x, y, frame) {
+	var sides = Math.ceil(x * 10);
+	this.KaleidoEffect.uniforms['sides'].value = x * 7;
+	this.KaleidoEffect.uniforms['offset'].value = y * 6;
+	this.ColorEffect.uniforms['hue'].value = Math.cos(frame * 0.004);
+	this.composer.render();
+};
+
+// var Film = function(renderer, texture){
+// 	this.composer = new THREE.EffectComposer( renderer );
+// 	this.composer.addPass( new THREE.TexturePass( texture, 1.0 ));
+
+// 	this.rgbEffect = new THREE.ShaderPass( THREE.ColorExperimentShader );
+// 	this.rgbEffect.uniforms[ 'amount' ].value = 0.0015;
+// 	//this.rgbEffect.renderToScreen = true;
+// 	this.Experiment = new THREE.ShaderPass( THREE.HueSaturationShader);
+// 	this.Experiment.renderToScreen = true;
+
+// 	this.composer.addPass( this.rgbEffect);
+// 	this.composer.addPass( this.Experiment );
+// }
+
+// Film.prototype.render = function(x, y){
+
+// 	this.rgbEffect.uniforms[ 'amount' ].value = 0.5-x;
+// 	this.Experiment.uniforms[ 'hue' ].value = y*2.0 - 1.0;
+// 		// scanlines effect intensity value (0 = no effect, 1 = full effect)
+
+// 	this.composer.render();
+// }
+
+var Difference = function Difference(renderer, texture, texture2) {
+	this.composer = new THREE.EffectComposer(renderer);
+	this.composer.addPass(new THREE.TexturePass(texture, 1.0));
+
+	this.Difference = new THREE.ShaderPass(THREE.DifferenceMirrorShader);
+
+	//this.Difference.renderToScreen = true;
+	this.Contrast = new THREE.ShaderPass(THREE.BrightnessContrastShader);
+	this.Contrast.uniforms['contrast'].value = 0.0;
+	this.Contrast.uniforms['brightness'].value = 0.2;
+	this.composer.addPass(this.Contrast);
+	this.composer.addPass(this.Difference);
+	this.Experiment = new THREE.ShaderPass(THREE.HueSaturationShader);
+	this.Experiment.renderToScreen = true;
+	this.composer.addPass(this.Experiment);
+};
+
+Difference.prototype.render = function (x, y) {
+	//this.Difference.uniforms[ 'sides' ].value = x*10;
+	this.Experiment.uniforms['hue'].value = x * 2.0 - 1.0;
+	this.Contrast.uniforms['contrast'].value = y;
+	//this.Contrast.uniforms['brightness'].value =  y*2.0 - 1.0;
+	//this.Difference.uniforms[ 'mixRatio' ].value = y;
+	this.composer.render();
+};
+
+// var Ascii = function(renderer, texture){
+// 	var characters = new ascii();
+// 	// characters.canvas.width = characters.canvas.height = 128;
+// 	//document.body.appendChild(characters.canvas);
+// 	//t = initTexture(characters.canvas);
+// t= new THREE.Texture( characters.canvas);
+// 	//console.log(t);
+// 	t.needsUpdate=true;
+// 	var woodTexture = THREE.ImageUtils.loadTexture( 'textures/crate.gif' );
+// 	this.composer = new THREE.EffectComposer( renderer );
+// 	this.contrast = new THREE.ShaderPass( THREE.BrightnessContrastShader);
+// 	this.contrast.uniforms['contrast'].value = 0.7;
+// 	this.composer.addPass( new THREE.TexturePass( texture, 1.0 ));
+// 	this.composer.addPass( this.contrast );
+// 	this.Ascii = new THREE.ShaderPass( THREE.AsciiShader);
+// 	this.Ascii.uniforms['tDiffuse2'].value = t;
+// 	this.Ascii.renderToScreen = true;
+// 	this.Ascii.uniforms['numChars'].value = characters.numChars;
+// 	this.composer.addPass( this.Ascii);
+// }
+
+// Ascii.prototype.render = function(x, y){
+// 	var cols = Math.floor(x * 150);
+// //	tex.needsUpdate = true;
+// 	this.Ascii.uniforms[ 'rows' ].value = cols * window.innerHeight / window.innerWidth;
+// 	this.Ascii.uniforms[ 'cols' ].value = cols;
+// 	this.contrast.uniforms ['contrast'].value = y;
+
+// 	this.composer.render();
+// }
+
+// var Checkerboard = function(renderer, texture){
+// 	this.composer = new THREE.EffectComposer( renderer );
+// 	this.composer.addPass( new THREE.TexturePass( texture, 1.0 ));
+// 	this.Checkerboard = new THREE.ShaderPass( THREE.CheckerboardShader);
+// 	this.Checkerboard.renderToScreen = true;
+// 	this.composer.addPass( this.Checkerboard);
+// }
+
+// Checkerboard.prototype.render = function(x, y){
+// 	this.Checkerboard.uniforms[ 'width' ].value = 2.0 - x*2.0;
+// 	this.Checkerboard.uniforms[ 'height' ].value = 2.0 - y*2.0;
+// 	//this.Difference.uniforms[ 'mixRatio' ].value = y;
+// 	this.composer.render();
+// }
+
+var GlassWarp = function GlassWarp(renderer, texture, lagTexture, texture2) {
+	this.composer = new THREE.EffectComposer(renderer);
+	this.Texture = new THREE.TexturePass(texture, 1.0);
+	//this.Texture.renderToScreen = true;
+	this.composer.addPass(this.Texture);
+	this.GlassWarp = new THREE.ShaderPass(THREE.ExperimentShader);
+	this.GlassWarp.uniforms['tDiffuse2'].value = lagTexture;
+	this.Contrast = new THREE.ShaderPass(THREE.BrightnessContrastShader);
+	//this.Contrast.uniforms['contrast'].value = 1.0;
+	//this.GlassWarp.renderToScreen = true;
+	//this.Contrast.renderToScreen = true;
+	this.composer.addPass(this.GlassWarp);
+	this.Saturation = new THREE.ShaderPass(THREE.HueSaturationShader);
+	//this.Saturation.renderToScreen = true;
+	this.composer.addPass(this.Contrast);
+	this.composer.addPass(this.Saturation);
+	this.BlendMask = new THREE.ShaderPass(THREE.BlendMaskShader);
+	this.BlendMask.uniforms['tDiffuse2'].value = texture;
+	this.BlendMask.uniforms['tDiffuse3'].value = texture2;
+	this.BlendMask.renderToScreen = true;
+	this.composer.addPass(this.BlendMask);
+	//this.composer.addPass( contrast );
+};
+
+GlassWarp.prototype.render = function (x, y, frame) {
+	// this.GlassWarp.uniforms[ 'mouseX' ].value = x;
+	// this.GlassWarp.uniforms[ 'mouseY' ].value = y;
+	// this.GlassWarp.uniforms[ 'mag' ].value = 40*Math.sin(frame*0.002);
+	//this.ColorEffect.uniforms[ 'hue' ].value = Math.cos(frame*0.01);
+	//this.Difference.uniforms[ 'mixRatio' ].value = y;
+	this.composer.render();
+};
+// var Experiment = function(renderer, texture){
+// 	this.composer = new THREE.EffectComposer( renderer );
+// 	this.composer.addPass( new THREE.TexturePass( texture, 1.0 ));
+// 	this.Experiment = new THREE.ShaderPass( THREE.HueSaturationShader);
+// 	this.Experiment.renderToScreen = true;
+// 	this.composer.addPass( this.Experiment );
+// }
+
+// Experiment.prototype.render = function(x, y, frame){
+// 	this.Experiment.uniforms[ 'hue' ].value = x*2.0 - 1.0;
+// 	this.Experiment.uniforms[ 'saturation' ].value = y*1.2 - 0.2;
+// 	//this.Experiment.uniforms[ 'mouseY' ].value = y;
+
+// 	//this.Difference.uniforms[ 'mixRatio' ].value = y;
+// 	this.composer.render();
+// }
+
+function initTexture(canvas) {
+	var tex = new THREE.Texture(canvas);
+	//needed because cant ensure that video has power of two dimensions
+	//tex.wrapS = THREE.ClampToEdgeWrapping;
+	//	tex.wrapT = THREE.ClampToEdgeWrapping;
+	tex.minFilter = THREE.LinearFilter;
+	tex.magFilter = THREE.LinearFilter;
+	return tex;
+}
+
+module.exports = EffectChain;
+
+},{"./AsciiGradient.js":1}],5:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -304,39 +622,133 @@ var SlitScan = (function () {
 exports['default'] = SlitScan;
 module.exports = exports['default'];
 
-},{}],4:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var WebGL = function WebGL(local_stream, remote_stream) {
-  _classCallCheck(this, WebGL);
+var composer;
+var EffectChain = require('./EffectChain.js');
+var frame = 0;
+var delay = 2;
+var WebGL = (function () {
+  function WebGL(local_stream, remote_stream) {
+    _classCallCheck(this, WebGL);
 
-  var renderer = new THREE.WebGLRenderer();
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.bodyinsertBefore(renderer.domElement, document.body.firstChild);
-};
+    this.video = document.getElementById("local-stream");
+    this.video.src = URL.createObjectURL(local_stream);
+    this.remote = document.getElementById("remote-stream");
+    this.remote.src = URL.createObjectURL(remote_stream);
+    this.renderer = new THREE.WebGLRenderer();
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.insertBefore(this.renderer.domElement, document.body.firstChild);
+    this.texture1 = this.initVideoTexture(this.video);
+    this.texture2 = this.initVideoTexture(this.remote);
+    this.lagTexture = this.initVideoTexture(this.video);
+    this.woodTexture = THREE.ImageUtils.loadTexture('./textures/crate.gif');
+    this.woodTexture.anisotropy = this.renderer.getMaxAnisotropy();
+    //this.initEffects();
+    this.effectChain = EffectChain("GlassWarp", this.renderer, this.texture1, this.lagTexture, this.texture2);
+  }
+
+  _createClass(WebGL, [{
+    key: "initVideoTexture",
+    value: function initVideoTexture(vid) {
+      var tex = new THREE.Texture(vid);
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      //tex.format = THREE.RGBFormat;
+      return tex;
+    }
+  }, {
+    key: "increaseDelay",
+    value: function increaseDelay() {
+      delay++;
+      console.log(delay);
+    }
+  }, {
+    key: "decreaseDelay",
+    value: function decreaseDelay() {
+      delay--;
+      if (delay < 1) {
+        delay = 1;
+      }
+      console.log(delay);
+    }
+  }, {
+    key: "addFrame",
+    value: function addFrame() {
+      frame++;
+      this.texture1.needsUpdate = true;
+      this.texture2.needsUpdate = true;
+      if (frame % delay == 0) {
+        this.lagTexture.needsUpdate = true;
+      } else {
+
+        this.lagTexture.needsUpdate = false;
+      }
+      this.effectChain.render(100, 100, 100);
+      //this.lagTexture.needsUpdate = true;
+
+      // this.texture2.needsUpdate = true;
+      // //console.log(this.composer);
+      // this.composer.render();
+    }
+  }, {
+    key: "initEffects",
+    value: function initEffects() {
+      this.composer = new THREE.EffectComposer(this.renderer);
+      var textureEffect = new THREE.TexturePass(this.woodTexture, 1.0);
+      textureEffect.renderToScreen = true;
+      console.log("tex");
+      console.log(textureEffect);
+      this.composer.addPass(textureEffect);
+      //shaderEffect = new THREE.ShaderPass(THREE.KaleidoShader);
+      //composer.addPass(shaderEffect);
+
+      // var  dotScreenEffect = new THREE.ShaderPass( THREE.DotScreenShader );
+      //  dotScreenEffect.uniforms[ 'scale' ].value = 0.8;
+      //  dotScreenEffect.renderToScreen = true;
+      //  this.composer.addPass( dotScreenEffect );
+      //blendEffect = new THREE.ShaderPass(THREE.DifferenceShader);
+      //  var blendEffect = new THREE.ShaderPass(THREE.DifferenceShader);
+      //   blendEffect.uniforms['tDiffuse2'].value = texture2;
+      // //blendEffect.uniforms['tDiffuse2'].value = woodTexture;
+      //   //blendEffect.uniforms['tDiffuse2'].value = texture1;
+      //   blendEffect.renderToScreen = true;
+      //   //shaderEffect.renderToScreen = true;
+
+      //  this.composer.addPass( blendEffect);
+    }
+  }]);
+
+  return WebGL;
+})();
 
 exports["default"] = WebGL;
 module.exports = exports["default"];
 
-},{}],5:[function(require,module,exports){
+},{"./EffectChain.js":4}],7:[function(require,module,exports){
 'use strict';
 
 var Peer = require('peerjs');
 var SlitScan = require('./js/SlitScan.js');
-var CanvasBlend = require('./js/CanvasBlend.js');
+var CanvasMotion = require('./js/CanvasMotion.js');
 var WebGL = require('./js/WebGL.js');
 var FPS = 10;
 
 var peer_api_key = '00gwj72654mfgvi';
 
-var slit, peer, dataChannel, localStream, remoteStream, slit, id, host;
+var slit, peer, dataChannel, localStream, remoteStream, slit, id, host, webGL;
 
 var communication = document.getElementById("communication");
 // Compatibility shim
@@ -432,11 +844,11 @@ function initParticipant(stream) {
 function initVideoEvents(call, stream) {
   call.on('stream', function (theirStream) {
     //$('#their-video').prop('src', URL.createObjectURL(theirStream));
-
-    slit = new CanvasBlend(stream, theirStream);
-    window.addEventListener('resize', function () {
-      slit.resize();
-    }, false);
+    webGL = new WebGL(stream, theirStream);
+    //slit = new CanvasMotion(stream, theirStream);
+    // window.addEventListener( 'resize', function(){
+    //   slit.resize();
+    // }, false );
 
     hideLanding();
 
@@ -451,10 +863,11 @@ function addFrame() {
   setTimeout(function () {
     addFrame();
     //console.log(dataChannel);
-    var vol = slit.getVolume();
-    //  console.log("sending "+ vol);
-    dataChannel.send(slit.getVolume());
-    slit.addFrame();
+    //   var vol = slit.getVolume();
+    // //  console.log("sending "+ vol);
+    //   dataChannel.send(slit.getVolume());
+    webGL.addFrame();
+    //slit.addFrame();
     // Drawing code goes here
   }, 1000 / FPS);
 }
@@ -472,47 +885,54 @@ function toggleVideo() {
 }
 function checkKey(e) {
   e = e || window.event;
-
-  console.log(e);
-  if (slit != null) {
-    e.preventDefault();
-    //arrow keys change step size
+  if (webGL != null) {
     if (e.keyCode == 38) {
-      slit.increaseStep();
+      webGL.increaseDelay();
     } else if (e.keyCode == 40) {
-      slit.decreaseStep();
-    } else if (e.keyCode == 83) {
-      if (FPS > 0.1) {
-        if (FPS <= 1) {
-          FPS -= 0.1;
-        } else {
-          FPS--;
-        }
-      }
-      console.log(FPS);
-    } else if (e.keyCode == 70) {
-      FPS++;
-      console.log(FPS);
-    } else if (e.keyCode == 77) {
-      //m to change mode
-      slit.changeMode();
-    } else if (e.keyCode == 73) {
-      //show or hide instructions
-    } else if (e.keyCode == 8) {
-        slit.restart();
-        //show or hide instructions
-      } else if (e.keyCode == 65) {
-          toggleMute();
-          //a for toggle mute
-        } else if (e.keyCode == 86) {
-            toggleVideo();
-          } else if (e.keyCode == 66) {
-            slit.changeBlend();
-          }
+      webGL.decreaseDelay();
+    }
   }
+  console.log(e);
+  // if(slit!=null){
+  //   e.preventDefault();
+  //   //arrow keys change step size
+  //   if(e.keyCode==38){
+  //     slit.increaseStep();
+  //   } else if(e.keyCode==40){
+  //     slit.decreaseStep();
+  //   } else if(e.keyCode==83){
+  //      if(FPS>0.1){
+  //       if(FPS<=1){
+  //         FPS-=0.1;
+  //       } else {
+  //         FPS--;
+  //       }
+  //     }
+  //     console.log(FPS);
+  //   } else if(e.keyCode==70){
+  //     FPS++;
+  //     console.log(FPS);
+  //   } else if(e.keyCode==77){
+  //     //m to change mode
+  //     slit.changeMode();
+  //   } else if(e.keyCode==73){
+  //     //show or hide instructions
+  //   } else if(e.keyCode==8){
+  //     slit.restart();
+  //     //show or hide instructions
+  //    } else if(e.keyCode==65){
+  //    toggleMute();
+  //     //a for toggle mute
+  //   } else if(e.keyCode==86){
+  //     toggleVideo();
+  //   } else if(e.keyCode==66){
+  //     slit.changeBlend();
+  //   }
+
+  // }
 }
 
-},{"./js/CanvasBlend.js":2,"./js/SlitScan.js":3,"./js/WebGL.js":4,"peerjs":10}],6:[function(require,module,exports){
+},{"./js/CanvasMotion.js":3,"./js/SlitScan.js":5,"./js/WebGL.js":6,"peerjs":12}],8:[function(require,module,exports){
 module.exports.RTCSessionDescription = window.RTCSessionDescription ||
 	window.mozRTCSessionDescription;
 module.exports.RTCPeerConnection = window.RTCPeerConnection ||
@@ -520,7 +940,7 @@ module.exports.RTCPeerConnection = window.RTCPeerConnection ||
 module.exports.RTCIceCandidate = window.RTCIceCandidate ||
 	window.mozRTCIceCandidate;
 
-},{}],7:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 var util = require('./util');
 var EventEmitter = require('eventemitter3');
 var Negotiator = require('./negotiator');
@@ -789,7 +1209,7 @@ DataConnection.prototype.handleMessage = function(message) {
 
 module.exports = DataConnection;
 
-},{"./negotiator":9,"./util":12,"eventemitter3":13,"reliable":16}],8:[function(require,module,exports){
+},{"./negotiator":11,"./util":14,"eventemitter3":15,"reliable":18}],10:[function(require,module,exports){
 var util = require('./util');
 var EventEmitter = require('eventemitter3');
 var Negotiator = require('./negotiator');
@@ -886,7 +1306,7 @@ MediaConnection.prototype.close = function() {
 
 module.exports = MediaConnection;
 
-},{"./negotiator":9,"./util":12,"eventemitter3":13}],9:[function(require,module,exports){
+},{"./negotiator":11,"./util":14,"eventemitter3":15}],11:[function(require,module,exports){
 var util = require('./util');
 var RTCPeerConnection = require('./adapter').RTCPeerConnection;
 var RTCSessionDescription = require('./adapter').RTCSessionDescription;
@@ -1197,7 +1617,7 @@ Negotiator.handleCandidate = function(connection, ice) {
 
 module.exports = Negotiator;
 
-},{"./adapter":6,"./util":12}],10:[function(require,module,exports){
+},{"./adapter":8,"./util":14}],12:[function(require,module,exports){
 var util = require('./util');
 var EventEmitter = require('eventemitter3');
 var Socket = require('./socket');
@@ -1696,7 +2116,7 @@ Peer.prototype.listAllPeers = function(cb) {
 
 module.exports = Peer;
 
-},{"./dataconnection":7,"./mediaconnection":8,"./socket":11,"./util":12,"eventemitter3":13}],11:[function(require,module,exports){
+},{"./dataconnection":9,"./mediaconnection":10,"./socket":13,"./util":14,"eventemitter3":15}],13:[function(require,module,exports){
 var util = require('./util');
 var EventEmitter = require('eventemitter3');
 
@@ -1912,7 +2332,7 @@ Socket.prototype.close = function() {
 
 module.exports = Socket;
 
-},{"./util":12,"eventemitter3":13}],12:[function(require,module,exports){
+},{"./util":14,"eventemitter3":15}],14:[function(require,module,exports){
 var defaultConfig = {'iceServers': [{ 'url': 'stun:stun.l.google.com:19302' }]};
 var dataCount = 1;
 
@@ -2228,7 +2648,7 @@ var util = {
 
 module.exports = util;
 
-},{"./adapter":6,"js-binarypack":14}],13:[function(require,module,exports){
+},{"./adapter":8,"js-binarypack":16}],15:[function(require,module,exports){
 'use strict';
 
 /**
@@ -2459,7 +2879,7 @@ EventEmitter.EventEmitter3 = EventEmitter;
 //
 module.exports = EventEmitter;
 
-},{}],14:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 var BufferBuilder = require('./bufferbuilder').BufferBuilder;
 var binaryFeatures = require('./bufferbuilder').binaryFeatures;
 
@@ -2980,7 +3400,7 @@ function utf8Length(str){
   }
 }
 
-},{"./bufferbuilder":15}],15:[function(require,module,exports){
+},{"./bufferbuilder":17}],17:[function(require,module,exports){
 var binaryFeatures = {};
 binaryFeatures.useBlobBuilder = (function(){
   try {
@@ -3046,7 +3466,7 @@ BufferBuilder.prototype.getBuffer = function() {
 
 module.exports.BufferBuilder = BufferBuilder;
 
-},{}],16:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 var util = require('./util');
 
 /**
@@ -3366,7 +3786,7 @@ Reliable.prototype.onmessage = function(msg) {};
 
 module.exports.Reliable = Reliable;
 
-},{"./util":17}],17:[function(require,module,exports){
+},{"./util":19}],19:[function(require,module,exports){
 var BinaryPack = require('js-binarypack');
 
 var util = {
@@ -3463,4 +3883,4 @@ var util = {
 
 module.exports = util;
 
-},{"js-binarypack":14}]},{},[5]);
+},{"js-binarypack":16}]},{},[7]);
